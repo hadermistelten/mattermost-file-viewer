@@ -1,0 +1,49 @@
+{
+    "id": "com.brokk-sindre.file-viewer",
+    "name": "File Viewer",
+    "description": "A VS Code-like file tree and viewer/editor for Mattermost. Browse, view, and edit server-side files directly from the sidebar.",
+    "homepage_url": "https://github.com/Brokk-Sindre/mattermost-file-viewer",
+    "support_url": "https://github.com/Brokk-Sindre/mattermost-file-viewer/issues",
+    "icon_path": "assets/icon.svg",
+    "min_server_version": "9.0.0",
+    "server": {
+        "executables": {
+            "linux-amd64": "server/dist/plugin-linux-amd64",
+            "linux-arm64": "server/dist/plugin-linux-arm64",
+            "darwin-amd64": "server/dist/plugin-darwin-amd64",
+            "darwin-arm64": "server/dist/plugin-darwin-arm64"
+        }
+    },
+    "webapp": {
+        "bundle_path": "webapp/dist/main.js"
+    },
+    "settings_schema": {
+        "header": "File Viewer plugin settings. Configure which directory to expose and access controls.",
+        "footer": "",
+        "settings": [
+            {
+                "key": "RootPath",
+                "display_name": "Root Path",
+                "type": "text",
+                "default": "",
+                "help_text": "Absolute path to the directory to expose in the file viewer. Example: /home/agent/workspace",
+                "placeholder": "/path/to/directory"
+            },
+            {
+                "key": "AllowedExtensions",
+                "display_name": "Allowed Extensions",
+                "type": "text",
+                "default": "",
+                "help_text": "Comma-separated list of allowed file extensions. Leave empty to allow all. Example: .go,.js,.ts,.md,.txt,.json",
+                "placeholder": ".go,.js,.ts,.md,.txt"
+            },
+            {
+                "key": "AllowWrite",
+                "display_name": "Allow Write",
+                "type": "bool",
+                "default": false,
+                "help_text": "Allow users to edit and save files through the plugin."
+            }
+        ]
+    }
+}
