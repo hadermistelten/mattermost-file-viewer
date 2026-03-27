@@ -2,6 +2,7 @@
     "id": "com.brokk-sindre.file-viewer",
     "name": "File Viewer",
     "description": "A VS Code-like file tree and viewer/editor for Mattermost. Browse, view, and edit server-side files directly from the sidebar.",
+    "version": "1.2.0",
     "homepage_url": "https://github.com/Brokk-Sindre/mattermost-file-viewer",
     "support_url": "https://github.com/Brokk-Sindre/mattermost-file-viewer/issues",
     "icon_path": "assets/icon.svg",

@@ -4,6 +4,7 @@ export interface FileNode {
     isDir: boolean;
     size?: number;
     children?: FileNode[];
+    loaded?: boolean; // lazy: children fetched?
 }
 
 export interface FileContent {
@@ -13,6 +14,24 @@ export interface FileContent {
     mimeType: string;
     isBase64: boolean;
     size: number;
+}
+
+export interface SearchResult {
+    path: string;
+    line: number;
+    content: string;
+}
+
+export interface Tab {
+    path: string;
+    name: string;
+    content: FileContent | null;
+    modified: boolean;
+    editContent: string;
+}
+
+export interface PluginConfig {
+    allowWrite: boolean;
 }
 
 export interface PluginRegistry {

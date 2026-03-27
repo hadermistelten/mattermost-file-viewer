@@ -1,6 +1,6 @@
 {
     "name": "mattermost-file-viewer-webapp",
-    "version": "1.0.0",
+    "version": "1.2.0",
     "description": "Webapp for Mattermost File Viewer plugin",
     "main": "src/index.tsx",
     "scripts": {
@@ -9,7 +9,10 @@
     },
     "dependencies": {
         "react": "^18.2.0",
-        "react-dom": "^18.2.0"
+        "react-dom": "^18.2.0",
+        "react-markdown": "^9.0.1",
+        "remark-gfm": "^4.0.0",
+        "monaco-editor": "^0.46.0"
     },
     "devDependencies": {
         "@types/react": "^18.2.0",

@@ -11,6 +11,10 @@ module.exports = {
     },
     resolve: {
         extensions: ['.tsx', '.ts', '.js', '.jsx'],
+        fallback: {
+            fs: false,
+            path: false,
+        },
     },
     module: {
         rules: [
@@ -22,6 +26,10 @@ module.exports = {
             {
                 test: /\.css$/,
                 use: ['style-loader', 'css-loader'],
+            },
+            {
+                test: /\.ttf$/,
+                type: 'asset/resource',
             },
         ],
     },
