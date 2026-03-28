@@ -1,15 +1,19 @@
-import React, {useState, useCallback, useRef, useEffect} from 'react';
+import React, {useState, useRef, useEffect} from 'react';
 import {FileNode} from '../types';
+
+export interface MenuRequest {
+    x: number;
+    y: number;
+    node: FileNode;
+}
 
 interface FileTreeProps {
     nodes: FileNode[];
     selectedPath: string;
     onSelect: (node: FileNode) => void;
     onLoadChildren: (path: string) => Promise<FileNode[]>;
-    onCreateFile?: (dirPath: string) => void;
-    onCreateDir?: (dirPath: string) => void;
-    onDelete?: (node: FileNode) => void;
-    onRename?: (node: FileNode) => void;
+    onMove?: (sourcePath: string, destDir: string) => void;
+    onMenuRequest: (req: MenuRequest) => void;
     allowWrite: boolean;
 }
 
@@ -18,18 +22,10 @@ interface TreeNodeProps {
     selectedPath: string;
     onSelect: (node: FileNode) => void;
     onLoadChildren: (path: string) => Promise<FileNode[]>;
-    onCreateFile?: (dirPath: string) => void;
-    onCreateDir?: (dirPath: string) => void;
-    onDelete?: (node: FileNode) => void;
-    onRename?: (node: FileNode) => void;
+    onMove?: (sourcePath: string, destDir: string) => void;
+    onMenuRequest: (req: MenuRequest) => void;
     allowWrite: boolean;
     depth: number;
-}
-
-interface ContextMenu {
-    x: number;
-    y: number;
-    node: FileNode;
 }
 
 function getFileIcon(node: FileNode): string {
@@ -48,28 +44,28 @@ function getFileIcon(node: FileNode): string {
 }
 
 const TreeNode: React.FC<TreeNodeProps> = ({
-    node, selectedPath, onSelect, onLoadChildren,
-    onCreateFile, onCreateDir, onDelete, onRename, allowWrite, depth,
+    node, selectedPath, onSelect, onLoadChildren, onMove, onMenuRequest, allowWrite, depth,
 }) => {
     const [expanded, setExpanded] = useState(depth === 0);
     const [children, setChildren] = useState<FileNode[]>(node.children || []);
     const [loadedChildren, setLoadedChildren] = useState(false);
     const [loading, setLoading] = useState(false);
-    const [contextMenu, setContextMenu] = useState<{x: number; y: number} | null>(null);
-    const menuRef = useRef<HTMLDivElement>(null);
+    const [dragOverThis, setDragOverThis] = useState(false);
+    const labelRef = useRef<HTMLDivElement>(null);
 
-    // Close context menu on outside click
+    // Native contextmenu listener
     useEffect(() => {
+        const el = labelRef.current;
+        if (!el) return;
         const handler = (e: MouseEvent) => {
-            if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-                setContextMenu(null);
-            }
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            onMenuRequest({x: e.clientX, y: e.clientY, node});
         };
-        if (contextMenu) {
-            document.addEventListener('mousedown', handler);
-        }
-        return () => document.removeEventListener('mousedown', handler);
-    }, [contextMenu]);
+        el.addEventListener('contextmenu', handler, true);
+        return () => el.removeEventListener('contextmenu', handler, true);
+    }, [node, onMenuRequest]);
 
     const handleClick = async () => {
         if (node.isDir) {
@@ -89,10 +85,37 @@ const TreeNode: React.FC<TreeNodeProps> = ({
         }
     };
 
-    const handleContextMenu = (e: React.MouseEvent) => {
+    const handleKebabClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        onMenuRequest({x: rect.right, y: rect.top, node});
+    };
+
+    const handleDragStart = (e: React.DragEvent) => {
+        if (!allowWrite) return;
+        e.dataTransfer.setData('text/plain', node.path);
+        e.dataTransfer.effectAllowed = 'move';
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+        if (!allowWrite || !node.isDir) return;
         e.preventDefault();
         e.stopPropagation();
-        setContextMenu({x: e.clientX, y: e.clientY});
+        e.dataTransfer.dropEffect = 'move';
+        setDragOverThis(true);
+    };
+
+    const handleDragLeave = () => setDragOverThis(false);
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDragOverThis(false);
+        if (!allowWrite || !node.isDir) return;
+        const sourcePath = e.dataTransfer.getData('text/plain');
+        if (sourcePath && sourcePath !== node.path && onMove) {
+            onMove(sourcePath, node.path);
+        }
     };
 
     const isSelected = !node.isDir && node.path === selectedPath;
@@ -100,10 +123,15 @@ const TreeNode: React.FC<TreeNodeProps> = ({
     return (
         <div className='file-tree-node'>
             <div
-                className={`file-tree-label${isSelected ? ' selected' : ''}`}
+                ref={labelRef}
+                className={`file-tree-label${isSelected ? ' selected' : ''}${dragOverThis ? ' drop-target' : ''}`}
                 style={{paddingLeft: `${depth * 14 + 6}px`}}
                 onClick={handleClick}
-                onContextMenu={handleContextMenu}
+                draggable={allowWrite}
+                onDragStart={handleDragStart}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
                 title={node.path}
             >
                 {node.isDir ? (
@@ -113,39 +141,8 @@ const TreeNode: React.FC<TreeNodeProps> = ({
                 )}
                 <span className='file-tree-icon'>{getFileIcon(node)}</span>
                 <span className='file-tree-name'>{node.name}</span>
+                <span className='file-tree-kebab' onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); handleKebabClick(e); }}>⋮</span>
             </div>
-
-            {contextMenu && (
-                <div
-                    ref={menuRef}
-                    className='file-tree-context-menu'
-                    style={{top: contextMenu.y, left: contextMenu.x}}
-                >
-                    {allowWrite && node.isDir && (
-                        <>
-                            <div className='ctx-item' onClick={() => { setContextMenu(null); onCreateFile && onCreateFile(node.path); }}>
-                                📄 New File
-                            </div>
-                            <div className='ctx-item' onClick={() => { setContextMenu(null); onCreateDir && onCreateDir(node.path); }}>
-                                📁 New Folder
-                            </div>
-                        </>
-                    )}
-                    {allowWrite && (
-                        <>
-                            <div className='ctx-item' onClick={() => { setContextMenu(null); onRename && onRename(node); }}>
-                                ✏️ Rename
-                            </div>
-                            <div className='ctx-item ctx-danger' onClick={() => { setContextMenu(null); onDelete && onDelete(node); }}>
-                                🗑️ Delete
-                            </div>
-                        </>
-                    )}
-                    {!allowWrite && (
-                        <div className='ctx-item ctx-disabled'>No write access</div>
-                    )}
-                </div>
-            )}
 
             {node.isDir && expanded && (
                 <div className='file-tree-children'>
@@ -161,10 +158,8 @@ const TreeNode: React.FC<TreeNodeProps> = ({
                             selectedPath={selectedPath}
                             onSelect={onSelect}
                             onLoadChildren={onLoadChildren}
-                            onCreateFile={onCreateFile}
-                            onCreateDir={onCreateDir}
-                            onDelete={onDelete}
-                            onRename={onRename}
+                            onMove={onMove}
+                            onMenuRequest={onMenuRequest}
                             allowWrite={allowWrite}
                             depth={depth + 1}
                         />
@@ -176,8 +171,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
 };
 
 const FileTree: React.FC<FileTreeProps> = ({
-    nodes, selectedPath, onSelect, onLoadChildren,
-    onCreateFile, onCreateDir, onDelete, onRename, allowWrite,
+    nodes, selectedPath, onSelect, onLoadChildren, onMove, onMenuRequest, allowWrite,
 }) => {
     if (!nodes || nodes.length === 0) {
         return <div className='file-tree-empty'>No files found</div>;
@@ -192,10 +186,8 @@ const FileTree: React.FC<FileTreeProps> = ({
                     selectedPath={selectedPath}
                     onSelect={onSelect}
                     onLoadChildren={onLoadChildren}
-                    onCreateFile={onCreateFile}
-                    onCreateDir={onCreateDir}
-                    onDelete={onDelete}
-                    onRename={onRename}
+                    onMove={onMove}
+                    onMenuRequest={onMenuRequest}
                     allowWrite={allowWrite}
                     depth={0}
                 />

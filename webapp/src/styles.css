@@ -661,3 +661,50 @@ button {
 .code-textarea[readonly] {
     cursor: default;
 }
+
+/* Context menu separator */
+.ctx-separator {
+    height: 1px;
+    background: #45475a;
+    margin: 4px 6px;
+}
+
+/* Drop target highlight */
+.file-tree-label.drop-target {
+    background: rgba(203, 166, 247, 0.2);
+    outline: 1px dashed #cba6f7;
+    border-radius: 4px;
+}
+
+/* Draggable cursor */
+.file-tree-label[draggable="true"] {
+    cursor: grab;
+}
+
+.file-tree-label[draggable="true"]:active {
+    cursor: grabbing;
+}
+
+/* Kebab menu button on tree nodes */
+.file-tree-kebab {
+    margin-left: auto;
+    padding: 0 4px;
+    color: #6c7086;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    border-radius: 3px;
+    opacity: 0;
+    transition: opacity 0.15s, background 0.15s;
+    flex-shrink: 0;
+    line-height: 1;
+}
+
+.file-tree-label:hover .file-tree-kebab {
+    opacity: 1;
+}
+
+.file-tree-kebab:hover {
+    background: #45475a;
+    color: #cdd6f4;
+}

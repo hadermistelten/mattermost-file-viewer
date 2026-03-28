@@ -1,5 +1,6 @@
 import React, {useState, useEffect, useCallback, useRef} from 'react';
-import FileTree from './FileTree';
+import ReactDOM from 'react-dom';
+import FileTree, {MenuRequest} from './FileTree';
 import FileViewer from './FileViewer';
 import {FileNode, FileContent, Tab, SearchResult, PluginConfig} from '../types';
 
@@ -23,7 +24,9 @@ const Sidebar: React.FC<SidebarProps> = ({pluginId}) => {
     const [errorMsg, setErrorMsg] = useState('');
     const [dragOver, setDragOver] = useState(false);
     const [showDirUpload, setShowDirUpload] = useState(false);
+    const [ctxMenu, setCtxMenu] = useState<MenuRequest | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const ctxMenuRef = useRef<HTMLDivElement>(null);
 
     const pluginApiUrl = `/plugins/${pluginId}`;
 
@@ -257,6 +260,33 @@ const Sidebar: React.FC<SidebarProps> = ({pluginId}) => {
         }
     }, [pluginApiUrl, tabs, handleTabClose, fetchRootTree]);
 
+    const handleMove = useCallback(async (sourcePath: string, destDir: string) => {
+        const fileName = sourcePath.split('/').pop() || sourcePath;
+        const newPath = `${destDir}/${fileName}`;
+        if (sourcePath === newPath) return;
+
+        try {
+            const res = await fetch(`${pluginApiUrl}/api/v1/rename`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({oldPath: sourcePath, newPath}),
+            });
+            if (!res.ok) {
+                const data = await res.json();
+                showError(data.error || 'Failed to move');
+                return;
+            }
+            // Update tab paths
+            setTabs((prev) => prev.map((t) =>
+                t.path === sourcePath ? {...t, path: newPath} : t,
+            ));
+            showStatus(`Moved to ${destDir}/`);
+            fetchRootTree();
+        } catch (e: any) {
+            showError(e.message);
+        }
+    }, [pluginApiUrl, fetchRootTree]);
+
     const handleRename = useCallback(async (node: FileNode) => {
         const dirPart = node.path.includes('/') ? node.path.split('/').slice(0, -1).join('/') : '';
         const newName = window.prompt('New name:', node.name);
@@ -285,11 +315,17 @@ const Sidebar: React.FC<SidebarProps> = ({pluginId}) => {
         }
     }, [pluginApiUrl, fetchRootTree]);
 
-    // Drag and drop upload
+    // Drag and drop upload (only for external files, not internal moves)
     const handleDrop = useCallback(async (e: React.DragEvent) => {
         e.preventDefault();
         setDragOver(false);
         if (!allowWrite) return;
+
+        // If it's an internal tree drag (text/plain with a path), ignore here
+        const internalPath = e.dataTransfer.getData('text/plain');
+        if (internalPath && !e.dataTransfer.files.length) return;
+
+        if (!e.dataTransfer.files.length) return;
 
         const formData = new FormData();
         formData.append('dir', '.');
@@ -314,6 +350,45 @@ const Sidebar: React.FC<SidebarProps> = ({pluginId}) => {
             showError(e.message);
         }
     }, [pluginApiUrl, allowWrite, fetchRootTree]);
+
+    // Close context menu on any outside interaction
+    useEffect(() => {
+        if (!ctxMenu) return;
+        const close = (e: MouseEvent) => {
+            // Don't close if clicking inside the menu
+            if (ctxMenuRef.current && ctxMenuRef.current.contains(e.target as Node)) return;
+            setCtxMenu(null);
+        };
+        // Delay slightly so the opening click doesn't immediately close
+        const timer = setTimeout(() => {
+            document.addEventListener('mousedown', close);
+        }, 100);
+        return () => {
+            clearTimeout(timer);
+            document.removeEventListener('mousedown', close);
+        };
+    }, [ctxMenu]);
+
+    const handleMenuRequest = useCallback((req: MenuRequest) => {
+        setCtxMenu(req);
+    }, []);
+
+    const ctxAction = useCallback((fn: () => void) => {
+        setCtxMenu(null);
+        // Delay action so menu closes first
+        setTimeout(fn, 10);
+    }, []);
+
+    // Always reset dragOver on any dragend/drop anywhere
+    useEffect(() => {
+        const resetDrag = () => setDragOver(false);
+        document.addEventListener('dragend', resetDrag);
+        document.addEventListener('drop', resetDrag);
+        return () => {
+            document.removeEventListener('dragend', resetDrag);
+            document.removeEventListener('drop', resetDrag);
+        };
+    }, []);
 
     useEffect(() => {
         fetchConfig();
@@ -340,8 +415,26 @@ const Sidebar: React.FC<SidebarProps> = ({pluginId}) => {
         if (e.key === 'Enter') handleSearch();
     };
 
+    // Capture contextmenu at our container level to prevent Mattermost from intercepting
+    const sidebarRef = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        const el = sidebarRef.current;
+        if (!el) return;
+        const handler = (e: Event) => {
+            const target = e.target as HTMLElement;
+            if (target.closest('.file-tree-label')) {
+                e.preventDefault();   // block browser context menu
+                // Don't stopPropagation — React needs the event to bubble for delegation
+            }
+        };
+        // Use bubble phase so React's capture/delegation still works
+        el.addEventListener('contextmenu', handler, false);
+        return () => el.removeEventListener('contextmenu', handler, false);
+    }, []);
+
     return (
         <div
+            ref={sidebarRef}
             className={`file-viewer-sidebar${dragOver ? ' drag-over' : ''}`}
             onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
             onDragLeave={() => setDragOver(false)}
@@ -470,10 +563,8 @@ const Sidebar: React.FC<SidebarProps> = ({pluginId}) => {
                         selectedPath={tabs[activeTabIndex]?.path || ''}
                         onSelect={fetchFile}
                         onLoadChildren={loadChildren}
-                        onCreateFile={allowWrite ? handleCreateFile : undefined}
-                        onCreateDir={allowWrite ? handleCreateDir : undefined}
-                        onDelete={allowWrite ? handleDelete : undefined}
-                        onRename={allowWrite ? handleRename : undefined}
+                        onMove={allowWrite ? handleMove : undefined}
+                        onMenuRequest={handleMenuRequest}
                         allowWrite={allowWrite}
                     />
                     {allowWrite && (
@@ -507,6 +598,44 @@ const Sidebar: React.FC<SidebarProps> = ({pluginId}) => {
                     />
                 </div>
             </div>
+
+            {/* Context menu — rendered as portal on document.body to escape Mattermost's event interception */}
+            {ctxMenu && ReactDOM.createPortal(
+                <div
+                    ref={ctxMenuRef}
+                    className='file-tree-context-menu'
+                    style={{top: ctxMenu.y, left: ctxMenu.x, zIndex: 99999}}
+                >
+                    <div className='ctx-item' onClick={() => ctxAction(() => {
+                        navigator.clipboard.writeText(ctxMenu.node.path).catch(() => window.prompt('Path:', ctxMenu.node.path));
+                    })}>
+                        📋 Copy Path
+                    </div>
+                    {allowWrite && ctxMenu.node.isDir && (
+                        <>
+                            <div className='ctx-separator' />
+                            <div className='ctx-item' onClick={() => ctxAction(() => handleCreateFile(ctxMenu.node.path))}>
+                                📄 New File
+                            </div>
+                            <div className='ctx-item' onClick={() => ctxAction(() => handleCreateDir(ctxMenu.node.path))}>
+                                📁 New Folder
+                            </div>
+                        </>
+                    )}
+                    {allowWrite && (
+                        <>
+                            <div className='ctx-separator' />
+                            <div className='ctx-item' onClick={() => ctxAction(() => handleRename(ctxMenu.node))}>
+                                ✏️ Rename
+                            </div>
+                            <div className='ctx-item ctx-danger' onClick={() => ctxAction(() => handleDelete(ctxMenu.node))}>
+                                🗑️ Delete
+                            </div>
+                        </>
+                    )}
+                </div>,
+                document.body,
+            )}
 
             {/* Status / error bar */}
             {statusMsg && <div className='status-bar success'>{statusMsg}</div>}
