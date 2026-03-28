@@ -609,3 +609,55 @@
 button {
     font-family: inherit;
 }
+
+/* Code Editor (replaces Monaco) */
+.code-editor {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    background: #1e1e2e;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.line-numbers {
+    padding: 8px 0;
+    text-align: right;
+    color: #6c7086;
+    background: #181825;
+    border-right: 1px solid #313244;
+    user-select: none;
+    overflow: hidden;
+    min-width: 40px;
+    flex-shrink: 0;
+}
+
+.line-number {
+    padding: 0 8px 0 4px;
+    height: 1.5em;
+}
+
+.code-textarea {
+    flex: 1;
+    padding: 8px 12px;
+    background: #1e1e2e;
+    color: #cdd6f4;
+    border: none;
+    outline: none;
+    resize: none;
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    tab-size: 4;
+    white-space: pre;
+    overflow: auto;
+}
+
+.code-textarea:focus {
+    outline: none;
+}
+
+.code-textarea[readonly] {
+    cursor: default;
+}

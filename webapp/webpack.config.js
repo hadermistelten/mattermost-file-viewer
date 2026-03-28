@@ -5,9 +5,6 @@ module.exports = {
     output: {
         path: path.resolve(__dirname, 'dist'),
         filename: 'main.js',
-        library: {
-            type: 'commonjs2',
-        },
     },
     resolve: {
         extensions: ['.tsx', '.ts', '.js', '.jsx'],

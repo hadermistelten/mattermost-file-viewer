@@ -35,12 +35,20 @@ export interface PluginConfig {
 }
 
 export interface PluginRegistry {
-    registerRightHandSidebarComponent(component: React.ComponentType<any>): { id: string; showRHSAction: () => void };
+    registerRightHandSidebarComponent(component: React.ComponentType<any>, title?: string): { id: string; showRHSAction: any };
     registerChannelHeaderButtonAction(
         icon: React.ComponentType,
         action: () => void,
         dropdownText: string,
         tooltipText: string,
+    ): void;
+    registerAppBarComponent(
+        iconUrl: string,
+        action: ((channel: any, member: any) => void) | null,
+        tooltipText: string,
+        supportedProductIds: string[] | null,
+        rhsComponent?: React.ComponentType<any> | (() => JSX.Element),
+        rhsTitle?: string,
     ): void;
     registerWebSocketEventHandler(
         eventType: string,

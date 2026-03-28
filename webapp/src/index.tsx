@@ -5,39 +5,17 @@ import './styles.css';
 
 const PLUGIN_ID = 'com.brokk-sindre.file-viewer';
 
-// Folder icon component for the channel header button
-const FolderIcon: React.FC = () => (
-    <svg
-        width="16"
-        height="16"
-        viewBox="0 0 16 16"
-        fill="currentColor"
-        xmlns="http://www.w3.org/2000/svg"
-    >
-        <path d="M1 3.5A1.5 1.5 0 0 1 2.5 2h2.764c.958 0 1.76.56 2.311 1.184C7.985 3.648 8.48 4 9 4h4.5A1.5 1.5 0 0 1 15 5.5v7a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 12.5v-9z" />
-    </svg>
-);
-
-export default class FileViewerPlugin {
-    private showRHS: (() => void) | null = null;
-
+class FileViewerPlugin {
     initialize(registry: PluginRegistry, store: any): void {
-        // Register the right-hand sidebar component
-        const {showRHSAction} = registry.registerRightHandSidebarComponent(
-            () => <Sidebar pluginId={PLUGIN_ID} />,
-        );
-        this.showRHS = () => store.dispatch(showRHSAction);
-
-        // Register channel header button
-        registry.registerChannelHeaderButtonAction(
-            FolderIcon,
-            () => {
-                if (this.showRHS) {
-                    this.showRHS();
-                }
-            },
+        // Use registerAppBarComponent — it handles RHS toggle automatically
+        // No Redux dispatch needed, avoids thunk/dispatch issues
+        registry.registerAppBarComponent(
+            `/plugins/${PLUGIN_ID}/assets/icon.svg`,
+            null, // no action callback — rhsComponent handles it
             'File Viewer',
-            'Open File Viewer',
+            null, // all products
+            () => <Sidebar pluginId={PLUGIN_ID} />,
+            'File Viewer',
         );
 
         // Register WebSocket event handler for file changes
@@ -53,7 +31,9 @@ export default class FileViewerPlugin {
     }
 
     uninitialize(): void {
-        this.showRHS = null;
         delete (window as any).__fileViewerRefresh;
     }
 }
+
+// Register the plugin with Mattermost webapp
+(window as any).registerPlugin(PLUGIN_ID, new FileViewerPlugin());
